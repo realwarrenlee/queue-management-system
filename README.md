@@ -1,17 +1,6 @@
 # beans&beats at Christmas Together
 
-**Live app:** [Open the app](https://queue-management-system-ls56.onrender.com/) · [Ready board](https://queue-management-system-ls56.onrender.com/board)
-
-Submission test logins: select the role on the sign-in screen and enter its password.
-
-| Role | Password |
-| --- | --- |
-| Barista | `barista-871356ce8e4792c9bf68` |
-| Booth lead | `lead-e7ad2fa0418dc168bea7` |
-
-These shared logins are for synthetic submission orders. Change the passwords before taking real event orders.
-
-A browser-based coffee order and pickup system for beans&beats at Christmas Together on **26–29 November 2026, Marina Bay Sands, Singapore**. The event expects 40,000+ visitors; booth profits support Singapore Red Cross Young Hearts.
+This is a browser-based coffee order and pickup system for beans&beats at Christmas Together on **26–29 November 2026, Marina Bay Sands, Singapore**. The event expects 40,000+ visitors; booth profits support Singapore Red Cross Young Hearts.
 
 Requirements: tablet/phone browsers, offline saving and later sync, first names with PDPA handling, and payments through the organiser's separate POS. The brief allows optional mobile contact; this build collects no phone numbers.
 
@@ -25,6 +14,20 @@ All six modules are deployed on Render with Turso. Live checks on 22 October 202
 | Ready board | Public screen shows ready first names and numbers until collection. |
 | Menu | Booth leads edit names/prices and sold-out availability. |
 | Daily reports | Booth leads view Singapore-day cups/value and export CSV for POS comparison. |
+
+**Live app:**
+
+- [Open the app](https://queue-management-system-ls56.onrender.com/)
+- [Ready board](https://queue-management-system-ls56.onrender.com/board)
+
+Submission test logins: select the role on the sign-in screen and enter its password.
+
+| Role | Password |
+| --- | --- |
+| Barista | `barista-871356ce8e4792c9bf68` |
+| Booth lead | `lead-e7ad2fa0418dc168bea7` |
+
+These shared logins are for synthetic submission orders. Change the passwords before taking real event orders.
 
 ## Setup
 
@@ -97,5 +100,3 @@ Submit the repository link at [MyProjet](https://myprojet.co/home). Required art
 - Repository with this README covering setup, deployment and between-day operation.
 - Three-minute demo: order → guest alert → ready board, including Wi-Fi loss and recovery.
 - One-page technical PDF: stack/architecture, offline sync, personal data and PDPA handling, known limits.
-
-Add the demo video and technical PDF links at the top when available. Menu, POS mapping, physical rehearsal and production recovery still need sign-off.
