@@ -1,0 +1,16 @@
+node_modules/
+dist/
+data/
+backups/
+docs/
+output/
+design/
+tmp/
+.env
+.env.*
+!.env.example
+.playwright-cli/
+.superpowers/
+.research/
+*.log
+verification.md
