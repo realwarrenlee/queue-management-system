@@ -1,10 +1,21 @@
 # beans&beats at Christmas Together
 
+**Live app:** [Open the app](https://queue-management-system-ls56.onrender.com/) · [Ready board](https://queue-management-system-ls56.onrender.com/board)
+
+Submission test logins: select the role on the sign-in screen and enter its password.
+
+| Role | Password |
+| --- | --- |
+| Barista | `barista-871356ce8e4792c9bf68` |
+| Booth lead | `lead-e7ad2fa0418dc168bea7` |
+
+These shared logins are for synthetic submission orders. Change the passwords before taking real event orders.
+
 A browser-based coffee order and pickup system for beans&beats at Christmas Together on **26–29 November 2026, Marina Bay Sands, Singapore**. The event expects 40,000+ visitors; booth profits support Singapore Red Cross Young Hearts.
 
 Requirements: tablet/phone browsers, offline saving and later sync, first names with PDPA handling, and payments through the organiser's separate POS. The brief allows optional mobile contact; this build collects no phone numbers.
 
-All six modules work locally. Turso connectivity and database initialization are verified; public Render deployment and real-device rehearsal are still pending.
+All six modules are deployed on Render with Turso. Live checks on 22 October 2026 covered both staff roles, order → QR → Ready → Collected, menu availability, reports/CSV, offline reload/recovery, corrections and cancellation. Physical-device, peak-load and server-restart recovery checks remain pending.
 
 | Module | Current experience |
 | --- | --- |
@@ -33,12 +44,14 @@ Development: stop `npm start`, then run `npm run dev` (UI 5173, API 3001). Tests
 
 ## Deployment
 
-The submission target is **Render Free + Turso Free**, within their usage limits. Render serves the React build and Express API at one HTTPS address; Turso keeps the database across server restarts and deployments. The Turso connection, schema and six default menu entries are verified. Render environment settings and the live deployment are still pending.
+The live demo uses **Render Free + Turso Free**, within their usage limits. Render serves the React build and Express API at one HTTPS address; Turso stores the database. Public deployment and the main online/offline workflows are verified. Server-restart persistence, hosted backup/restore and event capacity still need rehearsal.
+
+For a new deployment:
 
 1. Push the repository to GitHub. The existing Turso submission database is ready; keep its orders synthetic.
 2. Create a Render Blueprint from [render.yaml](render.yaml).
 3. Enter private `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `SESSION_SECRET` (32+ characters), and distinct `BARISTA_PASSWORD` / `LEAD_PASSWORD` values (12+ characters) in Render. The local `.env` is not uploaded. The Blueprint selects Node 24 and production mode; startup requires both Turso settings and rejects default demo credentials.
-4. Deploy, then verify login, order → QR → Ready → Collected, menu, reports and offline recovery at the public URL. Restart the service to check persistence and continued numbering. Add the URL and two submission test logins at the top of this README.
+4. Deploy, then verify login, order → QR → Ready → Collected, menu, reports and offline recovery at the public URL. Restart the service to check persistence and continued numbering. Update the live URL and submission test logins above if they change.
 
 See [DEPLOYMENT.md](DEPLOYMENT.md) for setup, backups, restore/import and privacy cleanup, and [ARCHITECTURE.md](ARCHITECTURE.md) for the current design. Render Free sleeps after idle periods; document its cold start for judges and agree event hosting during hardening. A persistent Node server with local SQLite remains an alternative.
 
@@ -85,4 +98,4 @@ Submit the repository link at [MyProjet](https://myprojet.co/home). Required art
 - Three-minute demo: order → guest alert → ready board, including Wi-Fi loss and recovery.
 - One-page technical PDF: stack/architecture, offline sync, personal data and PDPA handling, known limits.
 
-Add the live/demo/PDF links at the top when available. Menu, POS mapping, physical rehearsal and production recovery still need sign-off.
+Add the demo video and technical PDF links at the top when available. Menu, POS mapping, physical rehearsal and production recovery still need sign-off.
