@@ -12,11 +12,11 @@ test('create retries return one numbered order and preserve the accepted price',
     const draft = input();
     const order = await store.create(draft);
     assert.equal(order.number, 1);
-    assert.equal(order.totalCents, 1200);
+    assert.equal(order.totalCents, 2000);
     await store.saveMenu('latte', { name: 'Latte', priceCents: 700, available: true });
     assert.deepEqual(await store.create(draft), order);
     assert.equal((await store.orders()).length, 1);
-    assert.equal((await store.create(input())).totalCents, 1600);
+    assert.equal((await store.create(input())).totalCents, 1800);
     store.close();
 });
 test('reject invalid names, quantities, menu items and sold-out drinks', async () => {
@@ -75,7 +75,7 @@ test('reports use Singapore dates, accepted prices and CSV-safe first names', as
     await store.create(input());
     const report = await store.report('2026-11-26');
     assert.equal(report.cups, 2);
-    assert.equal(report.totalCents, 1200);
+    assert.equal(report.totalCents, 2000);
     assert.equal((await store.report('2026-11-27')).cups, 2);
     assert.match(await store.csv('2026-11-26'), /'\=Alex/);
     await assert.rejects(async () => await store.report('2026-02-31'), /date/i);
@@ -118,17 +118,17 @@ test('corrections preserve unchanged accepted prices, validate added drinks and 
     const correction = { revision: order.revision, reason: 'Guest corrected their name', firstName: 'Alexa', lines: order.lines.map(line => ({ ...line, expectedUnitCents: line.unitCents })) };
     const corrected = await store.correct(order.id, correction);
     assert.equal(corrected.firstName, 'Alexa');
-    assert.equal(corrected.totalCents, 1200);
+    assert.equal(corrected.totalCents, 2000);
     assert.equal(corrected.number, order.number);
     assert.equal(corrected.guestToken, order.guestToken);
     await assert.rejects(async () => await store.correct(order.id, correction), /changed/i);
     await assert.rejects(async () => await store.correct(order.id, { ...correction, revision: corrected.revision, reason: ' ' }));
-    await assert.rejects(async () => await store.correct(order.id, { ...correction, revision: corrected.revision, lines: [{ menuId: 'mocha', milk: 'Dairy', temperature: 'Hot', quantity: 1, expectedUnitCents: 1 }] }), /price changed/i);
+    await assert.rejects(async () => await store.correct(order.id, { ...correction, revision: corrected.revision, lines: [{ menuId: 'flat-white', milk: 'Dairy', temperature: 'Hot', quantity: 1, expectedUnitCents: 1 }] }), /price changed/i);
     assert.equal((await store.get(order.id))!.firstName, 'Alexa');
-    assert.equal((await store.get(order.id))!.totalCents, 1200);
-    const replaced = await store.correct(order.id, { ...correction, revision: corrected.revision, reason: 'Guest asked for mocha instead', lines: [{ menuId: 'mocha', milk: 'Dairy', temperature: 'Hot', quantity: 1, expectedUnitCents: 600 }] });
-    assert.equal(replaced.totalCents, 600);
-    assert.equal((await store.history(order.id))[0].previous.totalCents, 1200);
+    assert.equal((await store.get(order.id))!.totalCents, 2000);
+    const replaced = await store.correct(order.id, { ...correction, revision: corrected.revision, reason: 'Guest asked for flat white instead', lines: [{ menuId: 'flat-white', milk: 'Dairy', temperature: 'Hot', quantity: 1, expectedUnitCents: 800 }] });
+    assert.equal(replaced.totalCents, 800);
+    assert.equal((await store.history(order.id))[0].previous.totalCents, 2000);
     assert.equal((await store.history(order.id))[0].role, 'lead');
     store.close();
 });
@@ -140,7 +140,7 @@ test('cancellation retains the ticket and audit trail, excludes value from repor
     await assert.rejects(async () => await store.cancel(order.id, { revision: order.revision, reason: 'Duplicate' }), /changed/i);
     const cancelled = await store.cancel(order.id, { revision: ready.revision, reason: 'Duplicate order' });
     assert.equal(cancelled.status, 'cancelled');
-    assert.equal(cancelled.totalCents, 1200);
+    assert.equal(cancelled.totalCents, 2000);
     assert.equal((await store.guest(order.guestToken))!.status, 'cancelled');
     assert.deepEqual(await store.board(), []);
     assert.equal((await store.report('2026-10-20')).totalCents, 0);
@@ -196,7 +196,7 @@ test('correcting drinks returns a ready ticket to waiting while name-only correc
     const ready = await store.transition(order.id, 'making', 'ready');
     const renamed = await store.correct(order.id, { revision: ready.revision, reason: 'Name corrected', firstName: 'Alexa', lines: ready.lines.map(line => ({ ...line, expectedUnitCents: line.unitCents })) });
     assert.equal(renamed.status, 'ready');
-    const replaced = await store.correct(order.id, { revision: renamed.revision, reason: 'Replace the wrong drink', firstName: 'Alexa', lines: [{ menuId: 'mocha', milk: 'Dairy', temperature: 'Hot', quantity: 1, expectedUnitCents: 600 }] });
+    const replaced = await store.correct(order.id, { revision: renamed.revision, reason: 'Replace the wrong drink', firstName: 'Alexa', lines: [{ menuId: 'flat-white', milk: 'Dairy', temperature: 'Hot', quantity: 1, expectedUnitCents: 800 }] });
     assert.equal(replaced.status, 'queued');
     assert.deepEqual(await store.board(), []);
     assert.equal((await store.guest(order.guestToken))!.status, 'queued');
@@ -209,7 +209,7 @@ test('status revisions reject stale advances after correction and Undo but accep
     assert.equal((await store.transition(order.id, 'queued', 'making', 'barista', order.revision)).revision, making.revision);
     const restored = await store.undo(order.id, making.revision, 'barista');
     await assert.rejects(async () => await store.transition(order.id, 'queued', 'making', 'barista', order.revision), /changed/i);
-    const corrected = await store.correct(order.id, { revision: restored.revision, reason: 'Replace drink', firstName: 'Alex', lines: [{ menuId: 'mocha', milk: 'Dairy', temperature: 'Hot', quantity: 1, expectedUnitCents: 600 }] });
+    const corrected = await store.correct(order.id, { revision: restored.revision, reason: 'Replace drink', firstName: 'Alex', lines: [{ menuId: 'flat-white', milk: 'Dairy', temperature: 'Hot', quantity: 1, expectedUnitCents: 800 }] });
     await store.transition(order.id, 'queued', 'making', 'barista', corrected.revision);
     await assert.rejects(async () => await store.transition(order.id, 'queued', 'making', 'barista', order.revision), /changed/i);
     await assert.rejects(async () => await store.transition(order.id, 'making', 'ready', 'barista', making.revision), /changed/i);

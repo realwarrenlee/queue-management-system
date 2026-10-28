@@ -9,18 +9,18 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Calendar } from '@/components/ui/calendar'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
-import { money, singaporeDay } from '../../shared/domain'
-import type { MenuItem, Report } from '../../shared/domain'
+import { menuOptions, milkOptionsFor, money, singaporeDay } from '../../shared/domain'
+import type { MenuItem, MenuOption, Report } from '../../shared/domain'
 import { api } from '@/lib/api'
 
 export function MenuControls({ menu, sync, connected }: { menu: MenuItem[]; sync: () => Promise<void>; connected: boolean }) {
-  const [edit, setEdit] = useState<MenuItem | null>(null)
+  const [edit, setEdit] = useState<MenuOption | null>(null)
   const [name, setName] = useState('')
   const [price, setPrice] = useState('')
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  function open(item: MenuItem) { setEdit(item); setName(item.name); setPrice((item.priceCents / 100).toFixed(2)); setError('') }
-  async function save(item: MenuItem, fields: Partial<Pick<MenuItem, 'name' | 'priceCents' | 'available'>>) {
+  function open(item: MenuOption) { setEdit(item); setName(item.name); setPrice((item.priceCents / 100).toFixed(2)); setError('') }
+  async function save(item: MenuOption, fields: Partial<Pick<MenuItem, 'name' | 'priceCents' | 'available'>>) {
     setBusy(true); setError('')
     try { await api(`/menu/${item.id}`, 'PATCH', fields); await sync(); setEdit(null) }
     catch (error) { setError(error instanceof Error ? error.message : 'Could not update this item.') }
@@ -30,13 +30,15 @@ export function MenuControls({ menu, sync, connected }: { menu: MenuItem[]; sync
     event.preventDefault()
     if (!edit) return
     if (!/^\d{1,3}(\.\d{1,2})?$/.test(price)) { setError('Enter a price with up to two decimal places.'); return }
-    void save(edit, { name, priceCents: Math.round(Number(price) * 100) })
+    const priceCents = Math.round(Number(price) * 100) - edit.extraCents
+    if (priceCents < 0) { setError(`Enter a price of at least ${money(edit.extraCents)}.`); return }
+    void save(edit, { name, priceCents })
   }
   return <section className="lead-page"><div className="page-heading"><h1>Today’s good things.</h1><p className="page-subtitle">Keep the counter and the menu in harmony.</p></div>
     {!connected && <p className="notice">Reconnect before changing the shared menu.</p>}{error && !edit && <p className="error" role="alert">{error}</p>}
-    <Table className="staff-table menu-table"><TableHeader><TableRow><TableHead>Drink</TableHead><TableHead className="numeric">Price</TableHead><TableHead>Available</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader><TableBody>{menu.map(item => <TableRow key={item.id}><TableCell><strong>{item.name}</strong></TableCell><TableCell className="numeric">{money(item.priceCents)}</TableCell><TableCell><div className="availability"><Switch checked={item.available} disabled={busy || !connected} aria-label={`${item.name} available`} onCheckedChange={available => void save(item, { available })} /><span>{item.available ? 'On the menu' : 'Sold out'}</span></div></TableCell><TableCell className="text-right"><Button className="table-action" variant="outline" disabled={busy || !connected} aria-label={`Edit ${item.name}`} onClick={() => open(item)}>Edit</Button></TableCell></TableRow>)}</TableBody></Table>
-    <p className="section-note">Existing orders keep the prices recorded when they were accepted. Starting menu and prices are samples.</p>
-    <Dialog open={!!edit} onOpenChange={value => { if (!value) setEdit(null) }}><DialogContent><DialogHeader><DialogTitle>Edit {edit?.name}</DialogTitle><DialogDescription>Changes apply to new orders after they sync.</DialogDescription></DialogHeader><form className="form-stack" onSubmit={submit}><Label htmlFor="menu-name">Drink name</Label><Input id="menu-name" value={name} maxLength={60} onChange={event => setName(event.target.value)} required /><Label htmlFor="menu-price">Base price (SGD)</Label><Input id="menu-price" inputMode="decimal" value={price} onChange={event => setPrice(event.target.value)} required />{error && <p className="error" role="alert">{error}</p>}<Button disabled={busy} type="submit">{busy ? 'Saving…' : 'Save changes'}</Button></form></DialogContent></Dialog>
+    <Table className="staff-table menu-table"><TableHeader><TableRow><TableHead>Drink</TableHead><TableHead className="numeric">Price</TableHead><TableHead>Available</TableHead><TableHead className="text-right">Action</TableHead></TableRow></TableHeader><TableBody>{menuOptions(menu).map(item => <TableRow key={`${item.id}-${item.milk}`}><TableCell><strong>{item.label}</strong></TableCell><TableCell className="numeric">{money(item.priceCents)}</TableCell><TableCell><div className="availability"><Switch checked={item.available} disabled={busy || !connected} aria-label={`${item.label} available`} onCheckedChange={available => void save(item, { available })} /><span>{item.available ? 'On the menu' : 'Sold out'}</span></div></TableCell><TableCell className="text-right"><Button className="table-action" variant="outline" disabled={busy || !connected} aria-label={`Edit ${item.label}`} onClick={() => open(item)}>Edit</Button></TableCell></TableRow>)}</TableBody></Table>
+    <p className="section-note">Oat versions share the drink’s name and availability and cost S$1 more. Iced adds S$1 per cup. Existing orders keep their accepted prices.</p>
+    <Dialog open={!!edit} onOpenChange={value => { if (!value) setEdit(null) }}><DialogContent><DialogHeader><DialogTitle>Edit {edit?.label}</DialogTitle><DialogDescription>{edit && milkOptionsFor(edit.id).length ? 'Changes apply to both regular and oat versions; prices stay S$1 apart.' : 'Changes apply to new orders after they sync.'}</DialogDescription></DialogHeader><form className="form-stack" onSubmit={submit}><Label htmlFor="menu-name">Drink name</Label><Input id="menu-name" value={name} maxLength={60} onChange={event => setName(event.target.value)} required /><Label htmlFor="menu-price">Price (SGD)</Label><Input id="menu-price" inputMode="decimal" value={price} onChange={event => setPrice(event.target.value)} required />{error && <p className="error" role="alert">{error}</p>}<Button disabled={busy} type="submit">{busy ? 'Saving…' : 'Save changes'}</Button></form></DialogContent></Dialog>
   </section>
 }
 

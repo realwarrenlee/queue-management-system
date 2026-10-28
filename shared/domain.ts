@@ -4,7 +4,10 @@ export const progressStatuses = ['queued', 'making', 'ready', 'collected'] as co
 export const statuses = [...progressStatuses, 'cancelled'] as const
 export type Status = typeof statuses[number]
 export const statusText: Record<Status, string> = { queued: 'Waiting', making: 'Making', ready: 'Ready to collect', collected: 'Collected', cancelled: 'Cancelled' }
-export const milkOptions = [{ name: 'Dairy', extraCents: 0 }, { name: 'Oat', extraCents: 100 }, { name: 'Soy', extraCents: 80 }, { name: 'No milk', extraCents: 0 }]
+export const milkOptions = [{ name: 'Dairy', label: 'Regular milk', extraCents: 0 }, { name: 'Oat', label: 'Oat milk', extraCents: 100 }] as const
+export const milkOptionsFor = (menuId: string) => ['latte', 'flat-white'].includes(menuId) ? milkOptions : []
+export const milkText = { Dairy: 'Regular milk', Oat: 'Oat milk', Soy: 'Soy milk', 'No milk': 'No milk' }
+export const icedExtraCents = 100
 export const temperatures = ['Hot', 'Iced'] as const
 export const lineSchema = z.object({
   menuId: z.string().min(1).max(80), milk: z.enum(['Dairy', 'Oat', 'Soy', 'No milk']),
@@ -23,11 +26,27 @@ export const correctionSchema = draftSchema.omit({ id: true }).extend(changeSche
 export type Draft = z.infer<typeof draftSchema>
 export type MenuItem = { id: string; name: string; priceCents: number; available: boolean; category: string; description: string }
 export type OrderLine = Draft['lines'][number] & { name: string; unitCents: number }
+export function drinkLabel(line: Pick<OrderLine, 'menuId' | 'name' | 'milk'>) {
+  if (line.milk === 'Dairy' && milkOptionsFor(line.menuId).length) return line.name
+  if (line.milk === 'No milk' && ['espresso', 'americano', 'pourover', 'black'].includes(line.menuId)) return line.name
+  return `${line.name} (${milkText[line.milk].toLowerCase()})`
+}
+export function menuOptions(menu: MenuItem[]) {
+  return menu.flatMap(item => {
+    const options = milkOptionsFor(item.id)
+    return (options.length ? options : [{ name: 'No milk' as const, extraCents: 0 }]).map(option => ({
+      ...item, milk: option.name, extraCents: option.extraCents, priceCents: item.priceCents + option.extraCents,
+      label: drinkLabel({ menuId: item.id, name: item.name, milk: option.name }),
+    }))
+  })
+}
+export type MenuOption = ReturnType<typeof menuOptions>[number]
+export const unitPriceCents = (item: MenuItem, line: Pick<OrderLine, 'milk' | 'temperature'>) => item.priceCents + (milkOptions.find(option => option.name === line.milk)?.extraCents ?? 0) + (line.temperature === 'Iced' ? icedExtraCents : 0)
 export type Order = { id: string; number: number; firstName: string; lines: OrderLine[]; totalCents: number; status: Status; guestToken: string; createdAt: string; updatedAt: string; eventDay: string; revision: number; undoUntil?: string }
 export type OrderChange = { action: 'advance' | 'undo' | 'correct' | 'cancel'; reason: string; role: Role; createdAt: string; previous: Order }
 export type GuestOrder = Pick<Order, 'number' | 'firstName' | 'lines' | 'status' | 'updatedAt'> & { ordersAhead: number }
 export type BoardOrder = Pick<Order, 'number' | 'firstName'>
-export type Snapshot = { orders: Order[]; menu: MenuItem[]; serverTime: string }
+export type Snapshot = { orders: Order[]; menu: MenuItem[]; serverTime: string; sourceId?: string }
 export type Role = 'barista' | 'lead'
 export type Report = { date: string; orders: number; cups: number; totalCents: number; drinks: { name: string; cups: number; totalCents: number }[] }
 export const money = (cents: number) => new Intl.NumberFormat('en-SG', { style: 'currency', currency: 'SGD' }).format(cents / 100)

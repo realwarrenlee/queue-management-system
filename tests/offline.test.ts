@@ -151,12 +151,36 @@ test('old offline status sequences are retained for review instead of advancing 
     await cacheSnapshot(db, { orders: [order], menu: [], serverTime: '' });
     for (let step = 0; step < 3; step++)
         await enqueueStatus(db, projectOrders([order], await db.pending.toArray())[0]);
-    await store.correct(order.id, { revision: order.revision, reason: 'Replace drink', firstName: 'Alex', lines: [{ menuId: 'mocha', milk: 'Oat', temperature: 'Iced', quantity: 1, expectedUnitCents: 700 }] });
+    await store.correct(order.id, { revision: order.revision, reason: 'Replace drink', firstName: 'Alex', lines: [{ menuId: 'flat-white', milk: 'Oat', temperature: 'Iced', quantity: 1, expectedUnitCents: 1000 }] });
     await flushPending(db, async (row) => row.kind === 'status' ? await store.transition(row.body.id, row.body.expected, row.body.next, 'barista', row.body.revision) : await store.create(row.body));
     assert.equal((await store.get(order.id))!.status, 'queued');
-    assert.equal((await store.get(order.id))!.lines[0].name, 'Mocha');
+    assert.equal((await store.get(order.id))!.lines[0].name, 'Flat white');
     assert.equal(await db.pending.count(), 3);
     assert.ok((await db.pending.toArray()).every(row => row.error));
     store.close();
     await db.delete();
+});
+
+test('a fresh database source replaces stale cached tickets while preserving pending offline work', async () => {
+    const db = new StaffDB(randomUUID());
+    const store = await Store.open(':memory:');
+    try {
+        const current = await store.create(command().body);
+        const stale = { ...current, id: randomUUID(), number: 14 };
+        const pending = command();
+        await db.cache.put({ key: 'snapshot', value: { orders: [stale], menu: [], serverTime: '' } });
+        await db.pending.add(pending);
+        const fresh = { ...await store.snapshot(), sourceId: 'turso-current' };
+        await cacheSnapshot(db, fresh);
+        assert.deepEqual((await db.cache.get('snapshot'))!.value.orders.map(order => order.id), [current.id]);
+        assert.equal((await db.pending.toArray())[0].body.id, pending.body.id);
+        const other = { ...current, id: randomUUID(), number: 1 };
+        await cacheSnapshot(db, { ...fresh, sourceId: 'another-database', orders: [other] });
+        assert.deepEqual((await db.cache.get('snapshot'))!.value.orders.map(order => order.id), [other.id]);
+        const making = { ...other, status: 'making' as const, revision: 1 };
+        await cacheSnapshot(db, { ...fresh, sourceId: 'another-database', orders: [making] });
+        await cacheSnapshot(db, { ...fresh, sourceId: 'another-database', orders: [other] });
+        assert.equal((await db.cache.get('snapshot'))!.value.orders[0].status, 'making');
+        assert.equal(await db.pending.count(), 1);
+    } finally { store.close(); await db.delete(); }
 });

@@ -30,6 +30,17 @@ test('Queue shows oldest unfinished tickets first with the action for their curr
   assert.match(initial[1], />Ready<\/button>/)
   assert.match(initial[2], />Start<\/button>/)
 
+  const variants = rows([{ ...order(6, 'queued'), lines: [
+    { ...order(6, 'queued').lines[0], milk: 'Oat' },
+    { ...order(6, 'queued').lines[0], milk: 'No milk' },
+    { ...order(6, 'queued').lines[0], milk: 'Soy' },
+    { ...order(6, 'queued').lines[0], menuId: 'black', name: 'Black coffee', milk: 'Dairy' },
+  ] }])[0]
+  assert.match(variants, /Hot Latte \(oat milk\)/, 'the barista sees the complete drink variant')
+  assert.match(variants, /Hot Latte \(no milk\)/, 'historical exceptions remain visible')
+  assert.match(variants, /Hot Latte \(soy milk\)/, 'historical soy orders retain their milk detail')
+  assert.match(variants, /Hot Black coffee \(regular milk\)/, 'historical milk added to black coffee remains explicit')
+
   const rush = Array.from({ length: 41 }, (_, index) => order(41 - index, 'queued'))
   rush[40].createdAt = '2026-10-19T23:50:00Z'
   const rushRows = rows(rush)

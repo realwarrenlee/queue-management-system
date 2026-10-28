@@ -29,7 +29,7 @@ test('remote-compatible backup and restore preserve orders, menu, history and th
   assert.equal((await restoreRemoteDatabase(target, snapshot, 100)).nextTicket, 101)
   await assert.rejects(restoreRemoteDatabase(target, snapshot, 100), /empty|populated/i)
   const restored = await Store.open(join(directory, 'destination.sqlite')); stores.push(restored)
-  assert.equal((await restored.get(order.id))!.totalCents, 1200)
+  assert.equal((await restored.get(order.id))!.totalCents, 2000)
   assert.equal((await restored.guest(order.guestToken))!.status, 'making')
   assert.equal((await restored.history(order.id)).length, 1)
   assert.equal((await restored.menu()).find(item => item.id === 'latte')!.available, false)

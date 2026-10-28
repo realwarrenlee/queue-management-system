@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogTrigger } from '@/components/ui/dialog'
 import { Brand } from '@/components/brand'
 import { api } from '@/lib/api'
-import { ticket } from '../../shared/domain'
+import { drinkLabel, ticket } from '../../shared/domain'
 import type { BoardOrder, GuestOrder, Status } from '../../shared/domain'
 
 const guestArtDescriptions: Record<Status, string> = {
@@ -75,7 +75,7 @@ export function GuestPage({ token }: { token: string }) {
     <h1 className="guest-headline" aria-live="polite">{order.firstName},<br />{headline}</h1>
     <div role="img" aria-label={guestArtDescriptions[order.status]} className={`barista-art art-${order.status}`} />
     <p className="guest-order-number">Order {ticket(order.number)}</p>
-    <div className="guest-drinks">{order.lines.map((line, index) => <div key={index}><strong>{line.quantity} × {line.temperature === 'Iced' ? 'Iced ' : ''}{line.name.toLowerCase()}</strong><p>{line.milk}{line.milk !== 'No milk' ? ' milk' : ''}</p></div>)}</div>
+    <div className="guest-drinks">{order.lines.map((line, index) => <div key={index}><strong>{line.quantity} × {line.temperature === 'Iced' ? 'Iced ' : ''}{drinkLabel(line).toLowerCase()}</strong></div>)}</div>
     <div className="guest-instructions">{order.status === 'ready' ? <><strong>Collect at the beans&beats counter.</strong><p>Show order {ticket(order.number)} when you arrive.</p></> : order.status === 'collected' ? <><strong>Collected with a little love.</strong><p>Thank you for supporting Young Hearts.</p></> : order.status === 'cancelled' ? <><strong>Please check with the counter.</strong><p>Quote order {ticket(order.number)} for help. Any payment adjustment is handled at the counter.</p></> : <>
       <p>{order.status === 'queued' ? order.ordersAhead ? `${order.ordersAhead} ${order.ordersAhead === 1 ? 'earlier order is' : 'earlier orders are'} waiting or being made. Preparation times vary.` : 'Your order is next in the waiting queue. Preparation times vary.' : 'We’re preparing your order. This page will update when it’s ready.'}</p>
       <Button className="sound-button" variant="outline" onClick={() => { if (sound) setSound(false); else void enableSound() }}>{sound ? <Check /> : <Volume2 />}{sound ? 'Turn page sound off' : 'Enable page sound'}</Button>

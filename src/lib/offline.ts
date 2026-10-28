@@ -17,10 +17,11 @@ export class StaffDB extends Dexie {
 export async function cacheSnapshot(db: StaffDB, snapshot: Snapshot) {
   await db.transaction('rw', db.cache, async () => {
     const cached = await db.cache.get('snapshot')
-    const orders = new Map((cached?.value.orders ?? []).map(order => [order.id, order]))
+    const sameSource = !snapshot.sourceId || snapshot.sourceId === cached?.value.sourceId
+    const orders = new Map((sameSource ? cached?.value.orders ?? [] : []).map(order => [order.id, order]))
     // Keep acknowledgements newer than an in-flight snapshot; orders are never deleted.
     for (const order of snapshot.orders) if ((order.revision ?? 0) >= (orders.get(order.id)?.revision ?? 0)) orders.set(order.id, order)
-    await db.cache.put({ key: 'snapshot', value: { ...snapshot, orders: [...orders.values()].sort((a, b) => a.number - b.number) } })
+    await db.cache.put({ key: 'snapshot', value: { ...snapshot, sourceId: snapshot.sourceId ?? cached?.value.sourceId, orders: [...orders.values()].sort((a, b) => a.number - b.number) } })
   })
 }
 export function projectOrders(orders: Order[], pending: Pending[]): Order[] {

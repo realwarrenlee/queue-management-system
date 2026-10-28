@@ -5,19 +5,19 @@ import type { Config, InStatement } from '@libsql/client'
 import { pathToFileURL, fileURLToPath } from 'node:url'
 import { localDatabase } from './local-database.ts'
 import type { DatabaseClient, QueryTransaction } from './local-database.ts'
-import { randomBytes } from 'node:crypto'
+import { createHash, randomBytes } from 'node:crypto'
 import { z } from 'zod'
-import { AppError, draftSchema, menuSchema, milkOptions, singaporeDay, progressStatuses, statuses, changeSchema, correctionSchema, revisionSchema } from '../shared/domain.ts'
+import { AppError, draftSchema, menuSchema, milkOptionsFor, unitPriceCents, singaporeDay, progressStatuses, statuses, changeSchema, correctionSchema, revisionSchema } from '../shared/domain.ts'
 import type { BoardOrder, Draft, GuestOrder, MenuItem, Order, OrderChange, OrderLine, Report, Role, Status } from '../shared/domain.ts'
 
 const undoWindowMs = 10_000
+const catalogVersion = 1
 const initialMenu = [
-  { id: 'latte', name: 'Latte', priceCents: 500, category: 'Coffee', description: 'Espresso, a little milk, a lovely pause.' },
-  { id: 'cappuccino', name: 'Cappuccino', priceCents: 500, category: 'Coffee', description: 'A classic, with a soft cloud of foam.' },
-  { id: 'black', name: 'Black coffee', priceCents: 400, category: 'Coffee', description: 'Our house espresso, long and smooth.' },
-  { id: 'mocha', name: 'Mocha', priceCents: 600, category: 'Coffee', description: 'Coffee meets a little chocolate comfort.' },
-  { id: 'chocolate', name: 'Chocolate', priceCents: 500, category: 'Something else', description: 'Rich cocoa. A hug in a cup.' },
-  { id: 'tea', name: 'Tea', priceCents: 400, category: 'Something else', description: 'A slow sip of something soothing.' },
+  { id: 'espresso', name: 'Espresso', priceCents: 300, category: 'Coffee', description: 'A small, full-flavoured shot.' },
+  { id: 'latte', name: 'Latte', priceCents: 800, category: 'Coffee', description: 'Espresso, a little milk, a lovely pause.' },
+  { id: 'flat-white', name: 'Flat white', priceCents: 800, category: 'Coffee', description: 'Espresso with smooth, velvety milk.' },
+  { id: 'americano', name: 'Americano', priceCents: 600, category: 'Coffee', description: 'Our house espresso, long and smooth.' },
+  { id: 'pourover', name: 'Pourover', priceCents: 1000, category: 'Coffee', description: 'Hand-brewed, one cup at a time.' },
 ]
 
 const localUrls = new WeakMap<DatabaseClient, string>()
@@ -60,7 +60,8 @@ export const schema = [
 export class Store {
   db: DatabaseClient
   now: () => Date
-  private constructor(db: DatabaseClient, now: () => Date) { this.db = db; this.now = now }
+  sourceId: string
+  private constructor(db: DatabaseClient, now: () => Date, sourceId: string) { this.db = db; this.now = now; this.sourceId = sourceId }
   static async open(pathOrConfig: string | Config, now = () => new Date()): Promise<Store> {
     const config = typeof pathOrConfig === 'string'
       ? { url: pathOrConfig === ':memory:' ? 'file::memory:' : pathToFileURL(pathOrConfig).href }
@@ -76,9 +77,15 @@ export class Store {
         const columns = (await tx.execute('PRAGMA table_info(orders)')).rows
         if (!columns.some(column => column.name === 'revision')) await tx.execute('ALTER TABLE orders ADD COLUMN revision INTEGER NOT NULL DEFAULT 0')
         if (!columns.some(column => column.name === 'anonymized_at')) await tx.execute('ALTER TABLE orders ADD COLUMN anonymized_at TEXT')
-        await tx.batch(initialMenu.map(item => ({ sql: 'INSERT OR IGNORE INTO menu (id,data) VALUES (?,?)', args: [item.id, JSON.stringify({ ...item, available: true })] })))
+        const menu = (await tx.execute('SELECT data FROM menu')).rows.map(row => JSON.parse(row.data as string))
+        // Keep the upgrade marker with menu data so backups retain later lead edits.
+        if (!menu.some(item => item.catalogVersion === catalogVersion)) {
+          await tx.execute('DELETE FROM menu')
+          await tx.batch(initialMenu.map(item => ({ sql: 'INSERT INTO menu (id,data) VALUES (?,?)', args: [item.id, JSON.stringify({ ...item, available: true, catalogVersion })] })))
+        }
+        await tx.execute("DELETE FROM menu WHERE id IN ('cappuccino','black','mocha','chocolate','tea')")
       })
-      return new Store(db, now)
+      return new Store(db, now, createHash('sha256').update(config.url).digest('hex'))
     } catch (error) { db.close(); throw error }
   }
   close() { this.db.close() }
@@ -115,16 +122,18 @@ export class Store {
   }
   async get(id: string) { return transact(this.db, 'read', async tx => (await this.ordersFrom(tx, id))[0] as Order | undefined) }
   async orders() { return transact(this.db, 'read', tx => this.ordersFrom(tx)) }
-  async snapshot() { return transact(this.db, 'read', async tx => ({ orders: await this.ordersFrom(tx), menu: await this.menuFrom(tx), serverTime: this.now().toISOString() })) }
+  async snapshot() { return transact(this.db, 'read', async tx => ({ orders: await this.ordersFrom(tx), menu: await this.menuFrom(tx), serverTime: this.now().toISOString(), sourceId: this.sourceId })) }
   private async priceLines(db: QueryTransaction, lines: Draft['lines'], previous?: Order): Promise<OrderLine[]> {
     const menu = await this.menuFrom(db)
     return lines.map(line => {
-      const accepted = previous?.lines.find(old => old.menuId === line.menuId && old.milk === line.milk && old.unitCents === line.expectedUnitCents)
+      const accepted = previous?.lines.find(old => old.menuId === line.menuId && old.milk === line.milk && old.temperature === line.temperature && old.unitCents === line.expectedUnitCents)
       if (accepted) return { ...line, name: accepted.name, unitCents: accepted.unitCents }
       const item = menu.find(item => item.id === line.menuId)
       if (!item) throw new AppError('That drink is no longer on the menu.')
       if (!item.available) throw new AppError(`${item.name} is sold out. Please review this order.`, 409)
-      const price = item.priceCents + milkOptions.find(option => option.name === line.milk)!.extraCents
+      const options = milkOptionsFor(item.id)
+      if (options.length ? !options.some(option => option.name === line.milk) : line.milk !== 'No milk') throw new AppError(options.length ? `${item.name} only offers regular milk or oat milk. Please review this order.` : `${item.name} is served without milk. Please review this order.`)
+      const price = unitPriceCents(item, line)
       if (line.expectedUnitCents !== undefined && line.expectedUnitCents !== price) throw new AppError(`${item.name}'s price changed. Please review this order.`, 409)
       return { ...line, name: item.name, unitCents: price }
     })

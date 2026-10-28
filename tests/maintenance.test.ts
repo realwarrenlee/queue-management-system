@@ -38,7 +38,7 @@ test('maintenance snapshot captures live WAL, history, menu, accepted prices and
     assert.equal(summary.nextTicket, 2);
     const restored = await Store.open(backup);
     try {
-        assert.equal((await restored.get(order.id))?.totalCents, 1200);
+        assert.equal((await restored.get(order.id))?.totalCents, 2000);
         assert.equal((await restored.get(order.id))?.status, 'making');
         assert.equal((await restored.guest(order.guestToken))?.firstName, 'Alex');
         assert.equal((await restored.history(order.id)).length, 1);
