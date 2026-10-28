@@ -12,5 +12,6 @@ tmp/
 .playwright-cli/
 .superpowers/
 .research/
+video/
 *.log
 verification.md
