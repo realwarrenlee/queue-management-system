@@ -100,3 +100,7 @@ Submit the repository link at [MyProjet](https://myprojet.co/home). Required art
 - Repository with this README covering setup, deployment and between-day operation.
 - Three-minute demo: order → guest alert → ready board, including Wi-Fi loss and recovery.
 - One-page technical PDF: stack/architecture, offline sync, personal data and PDPA handling, known limits.
+
+## License
+
+The platform is open source under the [MIT License](LICENSE).
